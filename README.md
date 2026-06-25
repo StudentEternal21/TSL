@@ -1,5 +1,5 @@
 # POSO — ASR Error Correction via RAG-Enhanced Post-Processing
-## "Ang igib sa salita ng bawat Pilipino."
+## "Ang Pag-igib sa Salita ng Bawat Pilipino."
 ---
 
 ## 📋 Project Information
@@ -13,7 +13,7 @@
 
 | Name                    | Role / Responsibility          |
 | ----------------------- | ------------------------------ |
-| `Jedrick Darren Ocenar` |   `Team Lead`                  |
+| `Jedrick Darren Ocenar` |  `Team Lead`                   |
 | `Apacible Enegue Eoghan`|  `Developer`                   |
 | `Pelayo Agatha Fei`     |  `Developer`                   |
 | `Layno Ryan Reimann`    |  `Developer`                   |
@@ -106,9 +106,9 @@ TSL/
 ├── requirements.txt       # Python dependencies
 ├── data/                  # Text corpus and audio samples
 ├── src/                   # Source modules
-│   ├── whisper_client.py  # Whisper API integration
-│   ├── rag_pipeline.py    # RAG retriever + LLM correction
-│   └── metrics.py         # ASR evaluation metrics
+│   ├── ingestion.py       # Whisper API integration
+│   ├── augmentation.py    # RAG retriever + LLM correction
+│   └── evaluation.py      # ASR evaluation metrics
 └── README.md              # This file
 ```
 
