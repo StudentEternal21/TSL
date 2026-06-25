@@ -101,7 +101,8 @@
 
 1. Run `ollama run qwen3.5:0.8b` in your terminal.
 2. Run `pipenv install` in your terminal.
-
+3. Run `pipenv shell` in your terminal.
+4. Run `python app.py` in your terminal.
 ---
 
 ## 🏗️ Draft Project Structure
