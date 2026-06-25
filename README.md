@@ -1,5 +1,5 @@
-# ProtoWika — ASR Error Correction via RAG-Enhanced Post-Processing
-
+# POSO — ASR Error Correction via RAG-Enhanced Post-Processing
+## "Ang igib sa salita ng bawat Pilipino."
 ---
 
 ## 📋 Project Information
@@ -22,7 +22,7 @@
 
 ## 🧭 Overview
 
-**ProtoWika** is a hackathon project that improves Automatic Speech Recognition (ASR) accuracy by pairing OpenAI Whisper with a local Retrieval-Augmented Generation (RAG) pipeline. Whisper's raw transcription is post-processed by a RAG-backed LLM that cross-references a domain-specific text corpus to detect and correct transcription errors — particularly for specialized terminology, proper nouns, and low-resource language content. The quality of the corrected output is then measured against Whisper's baseline using standard ASR metrics.
+**POSO** is a hackathon project that improves Automatic Speech Recognition (ASR) accuracy by pairing OpenAI Whisper with a local Retrieval-Augmented Generation (RAG) pipeline. Whisper's raw transcription is post-processed by a RAG-backed LLM that cross-references a domain-specific text corpus to detect and correct transcription errors — particularly for specialized terminology, proper nouns, and low-resource language content. The quality of the corrected output is then measured against Whisper's baseline using standard ASR metrics.
 
 ---
 
