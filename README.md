@@ -97,6 +97,12 @@
    | **BLEU** | N-gram overlap score commonly used in MT/NLP evaluation |
 
 ---
+## Setup
+
+1. Run `ollama run qwen3.5:0.8b` in your terminal.
+2. Run `pipenv install` in your terminal.
+
+---
 
 ## 🏗️ Draft Project Structure
 

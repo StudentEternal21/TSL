@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "fff75176b42c9dd045c29496ae43ea15fd301f2f87ab31dfbe059da73789e268"
+            "sha256": "22ad8944710212961c73043b60f5f54712d5c39d712b8820724084769a335a49"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -611,6 +611,15 @@
             ],
             "markers": "python_version >= '3.12'",
             "version": "==2.5.0"
+        },
+        "ollama": {
+            "hashes": [
+                "sha256:3ad7daab28e5a973445c36a73882a3ef698c2ebb00e21e308652741577509f7d",
+                "sha256:936d55daa684f474364c098611c933626f8d6c7d67065c5b7ae0c477b508b07f"
+            ],
+            "index": "pypi",
+            "markers": "python_version >= '3.8'",
+            "version": "==0.6.2"
         },
         "onnxruntime": {
             "hashes": [
