@@ -5,6 +5,7 @@ name = "pypi"
 
 [packages]
 faster-whisper = "*"
+ollama = "*"
 
 [dev-packages]
 
