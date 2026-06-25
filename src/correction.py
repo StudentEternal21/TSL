@@ -99,40 +99,58 @@ class TFIDFRetriever:
         scores.sort(key=lambda x: x[1], reverse=True)
         return scores[:top_k]
 
-def correct_transcript(raw_transcript, corpus_dir="data", model="qwen3.5:0.8b"):
+def correct_transcript(raw_transcript, corpus_dir="data", model="qwen3.5:2b"):
     """Corrects ASR transcript using RAG LLM."""
-    # 1. Load corpus
     corpus = load_jsonl_corpus(corpus_dir)
     if not corpus:
         print("Warning: Empty or missing corpus. Proceeding without RAG context.")
         context_str = "No reference texts available."
     else:
-        # 2. Retrieve top matching documents
         retriever = TFIDFRetriever(corpus)
         results = retriever.retrieve(raw_transcript, top_k=3)
         context_str = "\n".join([f"- {doc}" for doc, score in results if score > 0.0])
         if not context_str:
             context_str = "\n".join([f"- {doc}" for doc, _ in results[:2]])
 
-    # 3. Formulate Prompt
-    prompt = f"""You are an ASR transcript error correction assistant.
-Correct misspelt words, typos, and phonetic errors in the RAW TRANSCRIPT using the REFERENCE TEXTS context.
+    # Optimized prompt for 2B+ models: Separating rules (system) from data (user).
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are an expert ASR transcript correction tool. "
+                "Your task is to fix spelling and phonetic errors in the user's transcript using the provided reference context. "
+                "CRITICAL: Output ONLY the exact corrected text. Do not include explanations, conversational filler, or quotation marks."
+            )
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Context:\n{context_str}\n\n"
+                f"Transcript to correct:\n{raw_transcript}"
+            )
+        }
+    ]
 
-REFERENCE TEXTS:
-{context_str}
+    try:
+        response = ollama.chat(
+            model=model,
+            messages=messages,
+            options={
+                "temperature": 0.0,
+                # Bumped to 100 just in case you feed it a longer sentence
+                "num_predict": 100 
+            }
+        )
+        
+        content = response.get('message', {}).get('content', '')
+        content = content.strip(' "\'\n')
+        
+        return content, context_str
 
-RAW TRANSCRIPT TO CORRECT:
-{raw_transcript}
-
-Corrected transcript:"""
-
-    # 4. Generate correction via local LLM
-    response = ollama.generate(
-        model=model,
-        prompt=prompt
-    )
-    
-    return response.response.strip(), context_str
+    except Exception as e:
+        error_msg = f"ERROR: Ollama call failed. Details: {str(e)}"
+        print(error_msg)
+        return error_msg, context_str
 
 if __name__ == "__main__":
     # Test case: Cebuano transcript with typical ASR phonetic confusion/typo
