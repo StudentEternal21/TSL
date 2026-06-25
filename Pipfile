@@ -5,9 +5,6 @@ name = "pypi"
 
 [packages]
 faster-whisper = "*"
-transformers = "*"
-torch = "*"
-accelerate = "*"
 
 [dev-packages]
 
