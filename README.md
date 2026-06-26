@@ -145,6 +145,22 @@
   python api.py
   ```
   Starts a REST API at `http://127.0.0.1:5000/transcribe`.
+  
+  #### API Endpoint Documentation
+  - **Method**: `POST`
+  - **URL**: `http://127.0.0.1:5000/transcribe`
+  - **Content-Type**: `multipart/form-data`
+  - **Form Parameters**:
+    - `audio`: File (e.g. `.wav`, `.mp3`)
+    - `dialect`: String (one of: `ceb` | `ilo` | `hil` | `war` | `kap`)
+  
+  #### Example Request (cURL)
+  ```powershell
+  # Using curl.exe directly in PowerShell to avoid alias conflicts:
+  curl.exe -X POST http://127.0.0.1:5000/transcribe `
+    -F "dialect=war" `
+    -F "audio=@data/audio_speech/synthetic/war_001.wav"
+  ```
 
 ### 4. Running Integration Tests
 To verify the API against local test recordings:
