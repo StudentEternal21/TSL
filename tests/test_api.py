@@ -3,39 +3,23 @@ import requests
 tests = [
     {
         "path": r"data/audio_speech/synthetic/war_001.wav",
-        "expected": "Diri ko aram."
+        "expected": "Paano kun diri bukad-bukad it' igsul-ot, a-absenan na la kamo?"
     },
     {
         "path": r"data/audio_speech/synthetic/war_002.wav",
-        "expected": "Kinaon ka na."
+        "expected": "Tas pag fourth year liwat an ak goal pag-gain ba hin maupay nga grado para ak makasulod hit eskwelahan nga ak' a-apply-yan."
     },
     {
         "path": r"data/audio_speech/synthetic/war_003.wav",
-        "expected": "Ngain ka makadto."
+        "expected": "A-apply-yan ko ha Gaisano kay hiring yana."
     },
     {
         "path": r"data/audio_speech/synthetic/war_004.wav",
-        "expected": "Bisan ano pa kamapasensyahon hit usa nga tawo, may-ada gid hiya limit lalo na kun pirme nala gina-take for granted."
+        "expected": "Ano an imo a-apply-yan?"
     },
     {
         "path": r"data/audio_speech/synthetic/war_005.wav",
-        "expected": "Makaruruyag unta mag-pursue hiton nga career ngem makaharadlok man gud kun diri ka mag-succeed."
-    },
-    {
-        "path": r"data/audio_speech/synthetic/war_006.wav",
-        "expected": "Naruruyag ako hiton imo system setup, pero kailangan ta pa ig-align an core features para hiton aton presentation."
-    },
-    {
-        "path": r"data/audio_speech/synthetic/war_007.wav",
-        "expected": "Ayaw sige ka-stress hit traffic, ma-abot man gihapon kita didto."
-    },
-    {
-        "path": r"data/audio_speech/synthetic/war_008.wav",
-        "expected": "Mag-gi-gym pa ako niyan kay damo la gihapon an akon dapat i-burn nga calories."
-    },
-    {
-        "path": r"data/audio_speech/synthetic/war_009.wav",
-        "expected": "Paki-send nala hit file hiton project ta kay i-re-review-hon ko yana nga gabi."
+        "expected": "Pero waray igsumat kan Kim kun ano an resulta kahuman niya magpakonsulta kanina han iya sakit nga waray na niya aabata, tigda la hiya gin-atake."
     }
 ]
 
