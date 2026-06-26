@@ -3,13 +3,36 @@ from faster_whisper import WhisperModel
 
 # ── Tuneable constants ──────────────────────────────────────────────────────
 WHISPER_MODEL_SIZE = "large-v3"          # faster-whisper model size
-WHISPER_DEVICE     = "cuda"              # "cuda" or "cpu"
-WHISPER_COMPUTE    = "float16"           # "float16" (GPU) or "int8" (CPU)
+WHISPER_DEVICE     = "cpu"               # "cuda" (NVIDIA GPU) or "cpu"
+WHISPER_COMPUTE    = "int8"              # "float16" (CUDA) or "int8" (CPU)
 RAW_SOUND_DIR      = "data/raw_sound"   # default audio input folder
 # ────────────────────────────────────────────────────────────────────────────
 
 # Supported audio extensions
 _AUDIO_EXTENSIONS = {".wav", ".mp3", ".flac", ".ogg", ".m4a", ".mp4", ".webm"}
+
+
+def _load_model(
+    model_size: str,
+    device: str,
+    compute_type: str,
+) -> WhisperModel:
+    """
+    Load a WhisperModel, automatically falling back to CPU/int8 if the
+    requested device fails (e.g. CUDA driver version mismatch).
+    """
+    try:
+        model = WhisperModel(model_size, device=device, compute_type=compute_type)
+        print(f"[Whisper] Model loaded on {device} ({compute_type})")
+        return model
+    except RuntimeError as exc:
+        if device == "cpu":
+            raise   # already on CPU — nothing to fall back to
+        print(f"[Whisper] {device.upper()} unavailable ({exc}). "
+              f"Falling back to CPU/int8 …")
+        model = WhisperModel(model_size, device="cpu", compute_type="int8")
+        print("[Whisper] Model loaded on cpu (int8)")
+        return model
 
 
 def _resolve_path(relative: str) -> str:
@@ -55,7 +78,7 @@ def transcribe_file(
     if not os.path.isfile(audio_path):
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
-    model = WhisperModel(model_size, device=device, compute_type=compute_type)
+    model = _load_model(model_size, device, compute_type)
 
     segments, info = model.transcribe(
         audio_path,
@@ -121,7 +144,7 @@ def transcribe_folder(
         return {}
 
     print(f"[Whisper] Loading model '{model_size}' on {device} ({compute_type}) …")
-    model = WhisperModel(model_size, device=device, compute_type=compute_type)
+    model = _load_model(model_size, device, compute_type)
 
     results: dict[str, str] = {}
     total = len(audio_files)
