@@ -101,7 +101,8 @@
 
 1. Run `ollama run qwen3.5:0.8b` in your terminal.
 2. Run `pipenv install` in your terminal.
-
+3. Run `pipenv shell` in your terminal.
+4. Run `python app.py` in your terminal.
 ---
 
 ## 🏗️ Draft Project Structure
@@ -111,9 +112,14 @@ TSL/
 ├── app.py                 # Main application entry point
 ├── requirements.txt       # Python dependencies
 ├── data/                  # Text corpus and audio samples
+│   ├── metadata.csv       # Master ledger
+│   ├── audio_speech/      # Audio samples
+│   ├── noise_profiles/    # Background noise profiles
+│   └── raw_text/          # Text corpuses
 ├── src/                   # Source modules
 │   ├── ingestion.py       # Whisper API integration
-│   ├── augmentation.py    # RAG retriever + LLM correction
+│   ├── augmentation.py    # Background noise injection
+│   ├── correction.py      # RAG retriever + LLM correction
 │   └── evaluation.py      # ASR evaluation metrics
 └── README.md              # This file
 ```
