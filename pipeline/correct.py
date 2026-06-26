@@ -31,8 +31,7 @@ def run_correction(audio_path: str, language: str | None = None) -> None:
     Raises
     ------
     ValueError
-        If the resolved language ID is not recognised, or if the RAG pipeline
-        returns an empty corrected transcript.
+        If the resolved language ID is not recognised.
     """
     filename = os.path.basename(audio_path)
 
@@ -58,12 +57,13 @@ def run_correction(audio_path: str, language: str | None = None) -> None:
     print(f"[RAG] Retrieved context:\n{context}\n")
 
     if not corrected or not corrected.strip():
-        raise ValueError(
-            "[Correction] RAG pipeline returned an empty transcript. "
-            "Check the LLM/embedding service and corpus path."
+        print(
+            "[Correction] Warning: RAG pipeline returned an empty transcript. "
+            "Falling back to raw Whisper transcript."
         )
-
-    print(f"[RAG] Corrected transcript:\n{corrected}\n")
+        corrected = raw_transcript
+    else:
+        print(f"[RAG] Corrected transcript:\n{corrected}\n")
 
     # Stage 3 — Append to metadata.csv
     row = {
