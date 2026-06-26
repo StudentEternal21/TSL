@@ -116,10 +116,13 @@ TSL/
 │   ├── audio_speech/      # Audio samples
 │   ├── noise_profiles/    # Background noise profiles
 │   └── raw_text/          # Text corpuses
-├── src/                   # Source modules
+├── service/               # Source modules
+│   ├── whisper.py         # Whisper integration
+│   └── rag.py             # LLM correction
+├── pipeline/              # Source modules
 │   ├── ingestion.py       # Whisper API integration
 │   ├── augmentation.py    # Background noise injection
-│   ├── correction.py      # RAG retriever + LLM correction
+│   ├── correction.py      # RAG retriever
 │   └── evaluation.py      # ASR evaluation metrics
 └── README.md              # This file
 ```
