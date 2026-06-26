@@ -160,14 +160,7 @@ def _generate_and_save_plot(
     plt.savefig(plot_path)
     print(f"[Evaluation] Plot saved to: {plot_path}")
     
-    # Show the plot if interactive
-    try:
-        if plt.get_backend() != "agg":
-            plt.show()
-    except Exception:
-        pass
-    finally:
-        plt.close(fig)
+    plt.close(fig)
 
 
 def run_evaluation(
