@@ -6,11 +6,15 @@ import numpy as np
 import ollama
 
 # ── Tuneable constants ──────────────────────────────────────────────────────
-CHUNK_SIZE    = 200   # words per chunk
-CHUNK_OVERLAP = 40    # words of overlap between adjacent chunks
-TOP_K         = 10     # number of retrieved chunks to inject as context
-EMBED_MODEL   = "snowflake-arctic-embed2"   # ollama embedding model tag
-LLM_MODEL     = "gemma4:12b"               # ollama generation model tag
+CHUNK_SIZE      = 200                       # words per chunk
+CHUNK_OVERLAP   = 40                        # words of overlap between adjacent chunks
+TOP_K           = 5                         # number of retrieved chunks to inject as context
+EMBED_MODEL     = "snowflake-arctic-embed2" # ollama embedding model tag
+LLM_MODEL       = "gemma4:12b"             # ollama generation model tag
+LLM_TEMPERATURE = 0.0                       # 0.0 = deterministic output
+LLM_NUM_PREDICT = 4096                      # max tokens for LLM response (thinking + content)
+LLM_THINK       = False                      # Gemma 4 thinking traces can easily exceed 1024
+                                            # tokens; raise if content is consistently empty
 # ────────────────────────────────────────────────────────────────────────────
 
 # ── Language → corpus file mapping ──────────────────────────────────────────
@@ -365,13 +369,10 @@ def correct_transcript(
         response = ollama.chat(
             model=llm_model,
             messages=messages,
-            think=True,    # chain-of-thought improves phonetic reasoning on low-resource languages
+            think=LLM_THINK,    # chain-of-thought improves phonetic reasoning on low-resource languages
             options={
-                "temperature": 0.0,
-                # Gemma 4 thinking traces can easily exceed 1024 tokens,
-                # leaving nothing for the actual output.  2048 gives
-                # plenty of headroom for both thinking + response.
-                "num_predict": 2048,
+                "temperature": LLM_TEMPERATURE,
+                "num_predict": LLM_NUM_PREDICT,
             },
         )
 

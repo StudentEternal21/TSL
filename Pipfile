@@ -8,6 +8,7 @@ faster-whisper = "*"
 gradio = "*"
 ollama = "*"
 flask = "*"
+requests = "*"
 
 [dev-packages]
 
