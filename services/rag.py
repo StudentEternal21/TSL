@@ -320,12 +320,13 @@ def correct_transcript(
                 "that follows.\n\n"
                 f"Reference passages (format: [similarity] text):\n{context_str}\n\n"
                 # ── One-shot format example ───────────────────────────────────
-                "Example\n"
-                "Input:  an bisita nga mga tawo nga naganhi\n"
-                "Output: an bisita nga mga tawo nga nagaabot\n\n"
+                # Note: use natural chat phrasing — NOT a completion-style
+                # "Output:" suffix, which causes ollama.chat() to return an
+                # empty string (the model treats the label as end-of-turn).
+                "Example — wrong:   an bisita nga mga tawo nga naganhi\n"
+                "Example — correct: an bisita nga mga tawo nga nagaabot\n\n"
                 # ── Actual task ───────────────────────────────────────────────
-                f"Input:  {raw_transcript}\n"
-                "Output:"
+                f"Now correct this transcript:\n{raw_transcript}"
             ),
         },
     ]
@@ -337,12 +338,27 @@ def correct_transcript(
             think=True,    # chain-of-thought improves phonetic reasoning on low-resource languages
             options={
                 "temperature": 0.0,
-                # Gemma 4 thinking traces are substantially longer than earlier
-                # models — raise the budget so the output is never truncated.
-                "num_predict": 1024,
+                # Gemma 4 thinking traces can easily exceed 1024 tokens,
+                # leaving nothing for the actual output.  2048 gives
+                # plenty of headroom for both thinking + response.
+                "num_predict": 2048,
             },
         )
-        content = response.message.content.strip(' "\'\u2019\n')
+
+        # ── Debug: inspect what the model actually returned ───────────────
+        thinking = getattr(response.message, "thinking", None) or ""
+        raw_content = response.message.content or ""
+        print(f"[RAG-DEBUG] thinking length : {len(thinking)} chars")
+        print(f"[RAG-DEBUG] content  length : {len(raw_content)} chars")
+        if raw_content.strip():
+            print(f"[RAG-DEBUG] raw content     : {raw_content[:200]!r}")
+        else:
+            print(f"[RAG-DEBUG] content is EMPTY — checking thinking tail …")
+            # Show last 300 chars of thinking so we can see if the answer
+            # was placed inside the thinking block instead.
+            print(f"[RAG-DEBUG] thinking tail   : …{thinking[-300:]!r}")
+
+        content = raw_content.strip(' "\'\u2019\n')
         return content, context_str
 
     except Exception as exc:
@@ -357,7 +373,7 @@ if __name__ == "__main__":
     rebuild_flag = "--rebuild" in sys.argv
 
     # Test case: Waray transcript with typical ASR phonetic confusion
-    test_raw = "Paado kun diri bukad-bukad it' igsul-ot, a-absonan na la kimo?"
+    test_raw = "Waray pa hiya aaboton kay mapaso an bintanna."
     print(f"Raw transcript : {test_raw}\n")
 
     corrected, retrieved_context = correct_transcript(
