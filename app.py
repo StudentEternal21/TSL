@@ -21,7 +21,7 @@ from pipeline.correct import run_correction
 BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / "data"
 PROMPTS_FILE = DATA_DIR / "prompts.json"
-RECORDINGS_DIR = DATA_DIR / "whisper_sound_processing"
+RECORDINGS_DIR = DATA_DIR / "audio_speech"
 METADATA_FILE = DATA_DIR / "metadata.csv"
 
 LANGUAGES = ["Kapampangan","Cebuano", "Ilocano", "Hiligaynon", "Waray"]
@@ -51,7 +51,7 @@ PROMPTS = load_prompts()
 # ──────────────────────────────────────────────
 # Pipeline integration
 # ──────────────────────────────────────────────
-def submit_recording(audio_path, language, prompt_text):
+def submit_recording(audio_path, language, prompt_text, audio_type="donated"):
     """
     Save the recorded audio, then run the full
     Whisper → RAG correction pipeline on it.
@@ -59,13 +59,25 @@ def submit_recording(audio_path, language, prompt_text):
     if audio_path is None:
         return "⚠️ No recording found. Please record your voice first."
 
-    # Create language-specific recordings directory
-    lang_dir = RECORDINGS_DIR / language
+    # Place recordings under data/audio_speech/<audio_type>/
+    # No language subfolder — the lang_id prefix in the filename is
+    # sufficient for dialect detection in run_correction.
+    lang_dir = RECORDINGS_DIR / audio_type
     lang_dir.mkdir(parents=True, exist_ok=True)
+
+    # Map full name to 3-char ID
+    lang_map = {
+        "Kapampangan": "kap",
+        "Cebuano": "ceb",
+        "Ilocano": "ilo",
+        "Hiligaynon": "hil",
+        "Waray": "war"
+    }
+    lang_id = lang_map.get(language, "unk")
 
     # Generate a unique filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{language}_{timestamp}.wav"
+    filename = f"{lang_id}_{timestamp}.wav"
     dest_path = lang_dir / filename
 
     # Copy the audio file from Gradio's temp location
@@ -76,12 +88,12 @@ def submit_recording(audio_path, language, prompt_text):
     # results (audio_path, dialect, raw_whisper_transcript, corrected_transcript)
     # to data/metadata.csv — so we read the last row back to display them.
     try:
-        run_correction(str(dest_path))
+        run_correction(str(dest_path), language=lang_id)
 
         # Read back the last row from metadata.csv to display results
         with open(METADATA_FILE, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
-            rows = list(reader)
+            rows = [r for r in reader if r["audio_path"] == str(os.path.abspath(dest_path))]
 
         if rows:
             last = rows[-1]
