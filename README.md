@@ -22,7 +22,7 @@
 
 ## 🧭 Overview
 
-**POSO** is a hackathon project that improves Automatic Speech Recognition (ASR) accuracy by pairing OpenAI Whisper with a local Retrieval-Augmented Generation (RAG) pipeline. Whisper's raw transcription is post-processed by a RAG-backed LLM that cross-references a domain-specific text corpus to detect and correct transcription errors — particularly for specialized terminology, proper nouns, and low-resource language content. The quality of the corrected output is then measured against Whisper's baseline using standard ASR metrics.
+**POSO** is a hackathon project that improves Automatic Speech Recognition (ASR) accuracy by pairing a local **faster-whisper** model with a local Retrieval-Augmented Generation (RAG) pipeline. Whisper's raw transcription is post-processed by a RAG-backed LLM that cross-references a domain-specific text corpus to detect and correct transcription errors — particularly for specialized terminology, proper nouns, and low-resource Philippine language content. The entire stack runs locally on consumer hardware, ensuring zero cloud costs and complete data privacy.
 
 ---
 
@@ -36,8 +36,8 @@
        │
        ▼
 ┌──────────────────┐
-│  OpenAI Whisper   │    ──►  Raw Transcript (baseline)
-│  (Cloud ASR)      │
+│  faster-whisper   │    ──►  Raw Transcript (baseline)
+│  (Local ASR)      │
 └──────┬───────────┘
        │
        ▼
@@ -69,8 +69,8 @@
 
 ### Step-by-Step Breakdown
 
-1. **Voice Input → OpenAI Whisper**
-   - Raw audio (`.wav`, `.mp3`, etc.) is sent to the OpenAI Whisper API.
+1. **Voice Input → faster-whisper**
+   - Raw audio (`.wav`, `.mp3`, etc.) is transcribed locally via `faster-whisper`.
    - Whisper returns a **raw transcript**, this serves as both the input to the next stage and the **baseline** for evaluation.
 
 2. **Whisper Output → Local RAG LLM**
@@ -106,25 +106,33 @@
 5. Run `python app.py` in your terminal.
 ---
 
-## 🏗️ Draft Project Structure
+## 🏗️ Project Structure
 
-```
+```text
 TSL/
-├── app.py                 # Main application entry point
-├── requirements.txt       # Python dependencies
-├── data/                  # Text corpus and audio samples
-│   ├── metadata.csv       # Master ledger
-│   ├── audio_speech/      # Audio samples
-│   ├── noise_profiles/    # Background noise profiles
-│   └── raw_text/          # Text corpuses
-├── service/               # Source modules
-│   ├── whisper.py         # Whisper integration
-│   └── rag.py             # LLM correction
-├── pipeline/              # Source modules
-│   ├── ingestion.py       # Whisper API integration
-│   ├── augmentation.py    # Background noise injection
-│   ├── correction.py      # RAG retriever
-│   └── evaluation.py      # ASR evaluation metrics
-└── README.md              # This file
+├── app.py                        # Main Gradio application entry point
+├── Pipfile                       # Python dependencies (Pipenv)
+├── data/                         # Data storage
+│   ├── metadata.csv              # Master ledger for recordings & transcripts
+│   ├── prompts.json              # Prompts served to the UI
+│   ├── raw_text/                 # Language text corpuses (.jsonl)
+│   ├── index/                    # Embedded RAG vector indices (.npy)
+│   └── whisper_sound_processing/ # Saved user recordings (.wav)
+├── services/                     # Core business logic
+│   ├── whisper.py                # Local faster-whisper integration
+│   ├── rag.py                    # RAG retrieval & LLM generation
+│   └── audio.py                  # Audio processing utilities
+├── pipeline/                     # Orchestration scripts
+│   ├── ingest.py                 # Data ingestion logic
+│   ├── augment.py                # Background noise injection
+│   ├── correct.py                # RAG correction pipeline runner
+│   └── evaluate.py               # ASR evaluation metrics
+└── README.md                     # This file
 ```
+
+---
+
+## 🤖 AI Disclosure
+
+Parts of this codebase, UI design, and documentation were built with the assistance of Artificial Intelligence tools to accelerate development and rapid prototyping.
 
