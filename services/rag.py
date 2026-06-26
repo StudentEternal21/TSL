@@ -20,12 +20,12 @@ LLM_THINK           = False
 # Minimum cosine similarity for the best retrieved chunk.
 # If the top-1 score falls below this, the LLM step is skipped entirely and
 # the raw transcript is returned unchanged (Fix 3: score-gated correction).
-SIMILARITY_THRESHOLD = 0.45
+SIMILARITY_THRESHOLD = 0.30
 
 # Maximum fraction of words that may change between the raw transcript and the
 # LLM-corrected output.  Corrections that exceed this are treated as
 # hallucinations and the raw transcript is restored (Fix 5: edit-distance guard).
-MAX_EDIT_RATIO = 0.40
+MAX_EDIT_RATIO = 1
 # ────────────────────────────────────────────────────────────────────────────
 
 # ── Language → corpus file mapping ──────────────────────────────────────────

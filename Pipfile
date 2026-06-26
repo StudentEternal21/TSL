@@ -9,6 +9,10 @@ gradio = "*"
 ollama = "*"
 flask = "*"
 requests = "*"
+matplotlib = "*"
+jiwer = "*"
+sentence-transformers = "*"
+nltk = "*"
 
 [dev-packages]
 

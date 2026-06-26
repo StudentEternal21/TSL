@@ -374,9 +374,9 @@ with gr.Blocks(title="POSO — Contributor Portal") as app:
         gr.HTML("<hr class='divider'>")
 
         audio_input = gr.Audio(
-            sources=["microphone"],
+            sources=["microphone", "upload"],
             type="filepath",
-            label="🎙️ Record your voice",
+            label="🎙️ Record or upload audio",
             elem_id="audio-recorder",
         )
 
