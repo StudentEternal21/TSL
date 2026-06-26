@@ -71,7 +71,7 @@
 
 1. **Voice Input → OpenAI Whisper**
    - Raw audio (`.wav`, `.mp3`, etc.) is sent to the OpenAI Whisper API.
-   - Whisper returns a **raw transcript** — this serves as both the input to the next stage and the **baseline** for evaluation.
+   - Whisper returns a **raw transcript**, this serves as both the input to the next stage and the **baseline** for evaluation.
 
 2. **Whisper Output → Local RAG LLM**
    - The raw transcript is passed to a locally hosted LLM augmented with Retrieval-Augmented Generation (RAG).
@@ -99,10 +99,11 @@
 ---
 ## Setup
 
-1. Run `ollama pull gemma4:12b snowflake-arctic-embed2` in your terminal.
-2. Run `pipenv install` in your terminal.
-3. Run `pipenv shell` in your terminal.
-4. Run `python app.py` in your terminal.
+1. Run `pip install ollama` in your terminal
+2. Run `ollama pull gemma4:12b snowflake-arctic-embed2` in your terminal.
+3. Run `pipenv install` in your terminal.
+4. Run `pipenv shell` in your terminal.
+5. Run `python app.py` in your terminal.
 ---
 
 ## 🏗️ Draft Project Structure
