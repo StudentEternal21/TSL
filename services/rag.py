@@ -7,7 +7,7 @@ import ollama
 # ── Tuneable constants ──────────────────────────────────────────────────────
 CHUNK_SIZE    = 200   # words per chunk
 CHUNK_OVERLAP = 40    # words of overlap between adjacent chunks
-TOP_K         = 3     # number of retrieved chunks to inject as context
+TOP_K         = 10     # number of retrieved chunks to inject as context
 EMBED_MODEL   = "snowflake-arctic-embed2"   # ollama embedding model tag
 LLM_MODEL     = "gemma4:12b"               # ollama generation model tag
 # ────────────────────────────────────────────────────────────────────────────
