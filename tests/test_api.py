@@ -40,7 +40,7 @@ tests = [
 ]
 
 def test_transcribe():
-    url = "http://127.0.0.1:5000/transcribe"
+    url = "https://36ea-2001-4451-1310-5b00-b1a9-8f35-b714-28df.ngrok-free.app/transcribe"
     dialect = "war"
     
     for t in tests:
