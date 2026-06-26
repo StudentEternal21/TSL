@@ -5,7 +5,6 @@ from faster_whisper import WhisperModel
 WHISPER_MODEL_SIZE = "large-v3"          # faster-whisper model size
 WHISPER_DEVICE     = "cpu"               # "cuda" (NVIDIA GPU) or "cpu"
 WHISPER_COMPUTE    = "int8"              # "float16" (CUDA) or "int8" (CPU)
-RAW_SOUND_DIR      = "data/whisper_sound_processing"   # default audio input folder
 # ────────────────────────────────────────────────────────────────────────────
 
 # Supported audio extensions
@@ -43,7 +42,7 @@ def _resolve_path(relative: str) -> str:
     return os.path.normpath(os.path.join(project_root, relative))
 
 
-def transcribe_file(
+def transcribe(
     audio_path: str,
     model_size: str = WHISPER_MODEL_SIZE,
     device: str     = WHISPER_DEVICE,
@@ -56,7 +55,8 @@ def transcribe_file(
     Parameters
     ----------
     audio_path : str
-        Absolute or project-root-relative path to the audio file.
+        Absolute or project-root-relative path to exactly one audio file.
+        Must be a file, not a directory.
     model_size : str
         faster-whisper model size tag (e.g. ``"large-v3"``, ``"medium"``).
     device : str
@@ -71,12 +71,31 @@ def transcribe_file(
     -------
     str
         The full transcribed text as a single string.
+
+    Raises
+    ------
+    ValueError
+        If ``audio_path`` is a directory or has an unsupported extension.
+    FileNotFoundError
+        If ``audio_path`` does not exist.
     """
     if not os.path.isabs(audio_path):
         audio_path = _resolve_path(audio_path)
 
-    if not os.path.isfile(audio_path):
-        raise FileNotFoundError(f"Audio file not found: {audio_path}")
+    if not os.path.exists(audio_path):
+        raise FileNotFoundError(f"[Whisper] Audio file not found: {audio_path}")
+
+    if os.path.isdir(audio_path):
+        raise ValueError(
+            f"[Whisper] Expected a single audio file, got a directory: {audio_path}"
+        )
+
+    ext = os.path.splitext(audio_path)[1].lower()
+    if ext not in _AUDIO_EXTENSIONS:
+        raise ValueError(
+            f"[Whisper] Unsupported audio format '{ext}'. "
+            f"Supported: {', '.join(sorted(_AUDIO_EXTENSIONS))}"
+        )
 
     model = _load_model(model_size, device, compute_type)
 
@@ -95,88 +114,11 @@ def transcribe_file(
     return transcript
 
 
-def transcribe_folder(
-    folder_path: str        = RAW_SOUND_DIR,
-    model_size: str         = WHISPER_MODEL_SIZE,
-    device: str             = WHISPER_DEVICE,
-    compute_type: str       = WHISPER_COMPUTE,
-    language: str | None    = None,
-) -> dict[str, str]:
-    """
-    Transcribe every supported audio file inside *folder_path*.
-
-    The model is loaded once and reused across all files for efficiency.
-
-    Parameters
-    ----------
-    folder_path : str
-        Absolute or project-root-relative path to the audio folder.
-        Defaults to ``data/raw_sound``.
-    model_size : str
-        faster-whisper model size tag.
-    device : str
-        Inference device — ``"cuda"`` or ``"cpu"``.
-    compute_type : str
-        Quantisation type.
-    language : str | None
-        BCP-47 language code to force, or ``None`` for auto-detection.
-
-    Returns
-    -------
-    dict[str, str]
-        Mapping of ``filename → transcript`` for every audio file found.
-        Files that fail are mapped to an error string prefixed with
-        ``"ERROR: "``.
-    """
-    if not os.path.isabs(folder_path):
-        folder_path = _resolve_path(folder_path)
-
-    if not os.path.isdir(folder_path):
-        raise NotADirectoryError(f"Audio folder not found: {folder_path}")
-
-    audio_files = sorted(
-        f for f in os.listdir(folder_path)
-        if os.path.splitext(f)[1].lower() in _AUDIO_EXTENSIONS
-    )
-
-    if not audio_files:
-        print(f"[Whisper] No supported audio files found in: {folder_path}")
-        return {}
-
-    print(f"[Whisper] Loading model '{model_size}' on {device} ({compute_type}) …")
-    model = _load_model(model_size, device, compute_type)
-
-    results: dict[str, str] = {}
-    total = len(audio_files)
-
-    for i, filename in enumerate(audio_files, start=1):
-        audio_path = os.path.join(folder_path, filename)
-        print(f"[Whisper] ({i}/{total}) Transcribing: {filename}")
-        try:
-            segments, info = model.transcribe(
-                audio_path,
-                language=language,
-                beam_size=5,
-                vad_filter=True,
-                vad_parameters={"min_silence_duration_ms": 500},
-            )
-            transcript = " ".join(seg.text.strip() for seg in segments)
-            print(f"[Whisper]   └─ lang={info.language} "
-                  f"({info.language_probability:.2f})  "
-                  f"chars={len(transcript)}")
-            results[filename] = transcript
-        except Exception as exc:
-            error_msg = f"ERROR: {exc}"
-            print(f"[Whisper]   └─ FAILED — {exc}")
-            results[filename] = error_msg
-
-    return results
-
-
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    transcripts = transcribe_folder()
-    print("\n── Transcripts ──────────────────────────────────────────────────")
-    for fname, text in transcripts.items():
-        print(f"\n{fname}:\n  {text}")
+    import sys
+
+    audio_path = sys.argv[1] if len(sys.argv) > 1 else "data/whisper_sound_processing/sample.wav"
+    result = transcribe(audio_path)
+    print(f"\n── Transcript ───────────────────────────────────────────────────\n{result}")
