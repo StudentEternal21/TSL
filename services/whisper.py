@@ -5,7 +5,7 @@ from faster_whisper import WhisperModel
 WHISPER_MODEL_SIZE = "large-v3"          # faster-whisper model size
 WHISPER_DEVICE     = "cpu"               # "cuda" (NVIDIA GPU) or "cpu"
 WHISPER_COMPUTE    = "int8"              # "float16" (CUDA) or "int8" (CPU)
-RAW_SOUND_DIR      = "data/raw_sound"   # default audio input folder
+RAW_SOUND_DIR      = "data/whisper_sound_processing"   # default audio input folder
 # ────────────────────────────────────────────────────────────────────────────
 
 # Supported audio extensions
