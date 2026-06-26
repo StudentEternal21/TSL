@@ -23,9 +23,10 @@ PROMPTS_FILE = DATA_DIR / "prompts.json"
 RECORDINGS_DIR = DATA_DIR / "recordings"
 METADATA_FILE = DATA_DIR / "metadata.csv"
 
-LANGUAGES = ["Cebuano", "Ilocano", "Hiligaynon", "Waray"]
+LANGUAGES = ["Kapampangan","Cebuano", "Ilocano", "Hiligaynon", "Waray"]
 
 LANGUAGE_LABELS = {
+    "Kapampangan": "🌋 Kapampangan",
     "Cebuano": "🌊 Cebuano",
     "Ilocano": "🌄 Ilocano",
     "Hiligaynon": "🌺 Hiligaynon",
@@ -324,6 +325,7 @@ with gr.Blocks(title="POSO — Contributor Portal") as app:
         gr.Markdown("Choose your language", elem_id="choose-label")
 
         with gr.Column(elem_id="lang-btn-group"):
+            btn_kapampangan = gr.Button("🌋  Kapampangan", elem_classes="lang-btn")
             btn_cebuano = gr.Button("🌊  Cebuano", elem_classes="lang-btn")
             btn_ilocano = gr.Button("🌄  Ilocano", elem_classes="lang-btn")
             btn_hiligaynon = gr.Button("🌺  Hiligaynon", elem_classes="lang-btn")
@@ -407,6 +409,10 @@ with gr.Blocks(title="POSO — Contributor Portal") as app:
         audio_input, status_msg,
     ]
 
+    btn_kapampangan.click(
+        fn=lambda: select_language("Kapampangan"),
+        outputs=lang_outputs,
+    )
     btn_cebuano.click(
         fn=lambda: select_language("Cebuano"),
         outputs=lang_outputs,
