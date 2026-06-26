@@ -373,7 +373,7 @@ if __name__ == "__main__":
     rebuild_flag = "--rebuild" in sys.argv
 
     # Test case: Waray transcript with typical ASR phonetic confusion
-    test_raw = "Waray pa hiya aaboton kay mapaso an bintanna."
+    test_raw = "Pero wara igsumat kan Kim kun ano an imo a-aplayan kay hiring yana."
     print(f"Raw transcript : {test_raw}\n")
 
     corrected, retrieved_context = correct_transcript(

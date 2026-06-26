@@ -1,4 +1,4 @@
-# POSO — ASR Error Correction via RAG-Enhanced Post-Processing
+# POSO: ASR Error Correction via RAG-Enhanced Post-Processing
 ## "Ang Pag-igib sa Salita ng Bawat Pilipino."
 ---
 
