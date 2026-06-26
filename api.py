@@ -74,29 +74,37 @@ def transcribe():
                      f"Allowed: {sorted(_ALLOWED_EXTENSIONS)}"
         }), 400
 
-    # ── Save to whisper_sound_processing ──────────────────────────────────────
+    # ── Run pipeline and clean up ─────────────────────────────────────────────
     save_path = os.path.join(_UPLOAD_DIR, filename)
     audio_file.save(save_path)
 
-    # ── Run pipeline ──────────────────────────────────────────────────────────
     try:
-        run_correction(save_path, language=dialect)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
-    except Exception as exc:
-        return jsonify({"error": f"Pipeline error: {exc}"}), 500
+        try:
+            run_correction(save_path, language=dialect)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except Exception as exc:
+            return jsonify({"error": f"Pipeline error: {exc}"}), 500
 
-    # ── Read result from CSV ──────────────────────────────────────────────────
-    row = _last_csv_row()
-    if row is None:
-        return jsonify({"error": "Pipeline completed but CSV row was not written."}), 500
+        # ── Read result from CSV ──────────────────────────────────────────────
+        row = _last_csv_row()
+        if row is None:
+            return jsonify({"error": "Pipeline completed but CSV row was not written."}), 500
 
-    return jsonify({
-        "dialect":               row.get("dialect"),
-        "audio_path":            row.get("audio_path"),
-        "raw_whisper_transcript": row.get("raw_whisper_transcript"),
-        "corrected_transcript":  row.get("corrected_transcript"),
-    }), 200
+        return jsonify({
+            "dialect":               row.get("dialect"),
+            "audio_path":            row.get("audio_path"),
+            "raw_whisper_transcript": row.get("raw_whisper_transcript"),
+            "corrected_transcript":  row.get("corrected_transcript"),
+        }), 200
+
+    finally:
+        # Clean up the temporary audio file
+        if os.path.exists(save_path):
+            try:
+                os.remove(save_path)
+            except Exception as e:
+                app.logger.error(f"Failed to delete temporary file {save_path}: {e}")
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

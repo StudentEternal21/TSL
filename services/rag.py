@@ -1,16 +1,31 @@
 import os
 import sys
 import json
+import difflib
 from typing import Literal
 import numpy as np
 import ollama
 
 # ── Tuneable constants ──────────────────────────────────────────────────────
-CHUNK_SIZE    = 200   # words per chunk
-CHUNK_OVERLAP = 40    # words of overlap between adjacent chunks
-TOP_K         = 10     # number of retrieved chunks to inject as context
-EMBED_MODEL   = "snowflake-arctic-embed2"   # ollama embedding model tag
-LLM_MODEL     = "gemma4:12b"               # ollama generation model tag
+CHUNK_SIZE          = 200     # words per chunk
+CHUNK_OVERLAP       = 40      # words of overlap between adjacent chunks
+TOP_K               = 5       # number of retrieved chunks to inject as context
+EMBED_MODEL         = "snowflake-arctic-embed2"
+LLM_MODEL           = "gemma4:12b"
+LLM_TEMPERATURE     = 0.0     # 0.0 = deterministic output
+LLM_NUM_PREDICT     = 4096    # max tokens for LLM response
+LLM_THINK           = False
+
+# ── Guard thresholds ────────────────────────────────────────────────────────
+# Minimum cosine similarity for the best retrieved chunk.
+# If the top-1 score falls below this, the LLM step is skipped entirely and
+# the raw transcript is returned unchanged (Fix 3: score-gated correction).
+SIMILARITY_THRESHOLD = 0.45
+
+# Maximum fraction of words that may change between the raw transcript and the
+# LLM-corrected output.  Corrections that exceed this are treated as
+# hallucinations and the raw transcript is restored (Fix 5: edit-distance guard).
+MAX_EDIT_RATIO = 0.40
 # ────────────────────────────────────────────────────────────────────────────
 
 # ── Language → corpus file mapping ──────────────────────────────────────────
@@ -21,7 +36,7 @@ CORPUS_MAP: dict[str, str] = {
     "ilo": "data/raw_text/ilokano_text.jsonl",
     "hil": "data/raw_text/hiligaynon_text.jsonl",
     "war": "data/raw_text/waray_text.jsonl",
-    "kap": "data/raw_text/kapamgpangan_text.jsonl",
+    "kap": "data/raw_text/kapampangan_text.jsonl",
 }
 
 _LANGUAGE_NAMES: dict[str, str] = {
@@ -30,6 +45,16 @@ _LANGUAGE_NAMES: dict[str, str] = {
     "hil": "Hiligaynon",
     "war": "Waray",
     "kap": "Kapampangan",
+}
+
+# Languages that should be explicitly excluded from LLM output to prevent
+# the model from drifting toward its higher-resource training data (Fix 2).
+_BANNED_LANGUAGES: dict[str, list[str]] = {
+    "ceb": ["Tagalog", "Filipino", "Hiligaynon", "Waray"],
+    "ilo": ["Tagalog", "Filipino", "Cebuano"],
+    "hil": ["Tagalog", "Filipino", "Cebuano", "Waray"],
+    "war": ["Tagalog", "Filipino", "Cebuano", "Hiligaynon"],
+    "kap": ["Tagalog", "Filipino", "Cebuano"],
 }
 # ────────────────────────────────────────────────────────────────────────────
 
@@ -94,7 +119,7 @@ def chunk_corpus(
             chunks.append(" ".join(words[start:end]))
             if end == len(words):
                 break
-            start += chunk_size - overlap   # slide forward by (chunk_size - overlap)
+            start += chunk_size - overlap
     return chunks
 
 
@@ -119,18 +144,6 @@ class EmbeddingRetriever:
     Retrieve
         Embed the query at runtime, compute vectorised cosine similarity
         against the stored matrix, return top-k (chunk, score) pairs.
-
-    Parameters
-    ----------
-    corpus_path : str
-        Path to a ``.jsonl`` file (or directory of ``.jsonl`` files).
-    index_dir : str | None
-        Where to store the cached index.  Defaults to
-        ``<corpus_dir>/../index/``.
-    embed_model : str
-        Ollama embedding model tag.
-    rebuild : bool
-        Discard any cached index and re-embed from scratch.
     """
 
     def __init__(
@@ -143,14 +156,12 @@ class EmbeddingRetriever:
         self.corpus_path = corpus_path
         self.embed_model = embed_model
 
-        # Derive cache directory next to the corpus file
         if index_dir is None:
-            corpus_dir  = os.path.dirname(os.path.abspath(corpus_path))
-            index_dir   = os.path.normpath(os.path.join(corpus_dir, "..", "index"))
+            corpus_dir = os.path.dirname(os.path.abspath(corpus_path))
+            index_dir  = os.path.normpath(os.path.join(corpus_dir, "..", "index"))
         self.index_dir = index_dir
         os.makedirs(self.index_dir, exist_ok=True)
 
-        # Stable, corpus-specific file names inside the cache directory
         stem = os.path.splitext(os.path.basename(corpus_path))[0]
         self._emb_path   = os.path.join(self.index_dir, f"{stem}_embeddings.npy")
         self._chunk_path = os.path.join(self.index_dir, f"{stem}_chunks.json")
@@ -169,7 +180,6 @@ class EmbeddingRetriever:
         )
 
     def _build_index(self) -> None:
-        """Chunk the corpus, embed every chunk, and persist to disk."""
         print(f"[RAG] Building embedding index from: {self.corpus_path}")
         corpus = load_jsonl_corpus(self.corpus_path)
         if not corpus:
@@ -190,7 +200,6 @@ class EmbeddingRetriever:
 
         self.embeddings: np.ndarray = np.array(raw_embeddings, dtype=np.float32)
 
-        # Persist
         np.save(self._emb_path, self.embeddings)
         with open(self._chunk_path, "w", encoding="utf-8") as fh:
             json.dump(self.chunks, fh, ensure_ascii=False, indent=2)
@@ -199,7 +208,6 @@ class EmbeddingRetriever:
         print(f"[RAG]              → {self._chunk_path}")
 
     def _load_index(self) -> None:
-        """Load the pre-built index from disk (fast path)."""
         print(f"[RAG] Loading cached embedding index …")
         self.embeddings = np.load(self._emb_path)
         with open(self._chunk_path, "r", encoding="utf-8") as fh:
@@ -220,8 +228,6 @@ class EmbeddingRetriever:
         resp = ollama.embed(model=self.embed_model, input=query)
         query_vec = np.array(resp.embeddings[0], dtype=np.float32)
 
-        # Vectorised cosine similarity against all stored chunk embeddings
-        # scores = (E @ q) / (||E|| * ||q||)
         chunk_norms = np.linalg.norm(self.embeddings, axis=1)
         query_norm  = np.linalg.norm(query_vec)
 
@@ -234,6 +240,51 @@ class EmbeddingRetriever:
 
         top_indices = np.argsort(scores)[::-1][:top_k]
         return [(self.chunks[i], float(scores[i])) for i in top_indices]
+
+
+# ── Fix 3 helper: per-sentence retrieval aggregation ─────────────────────────
+
+def _retrieve_for_transcript(
+    retriever: EmbeddingRetriever,
+    transcript: str,
+    top_k: int,
+) -> list[tuple[str, float]]:
+    """
+    Split the transcript into sentences, retrieve top-2 chunks per sentence,
+    deduplicate, and return the top-k by score.
+
+    Long transcripts embed as a single dense vector that may not match any
+    corpus chunk well.  Querying sentence-by-sentence produces much more
+    targeted retrieval (Fix 4: query expansion).
+    """
+    # Simple sentence split on periods; handles most Waray / Philippine text.
+    sentences = [s.strip() for s in transcript.replace("?", ".").replace("!", ".").split(".") if s.strip()]
+
+    # Fall back to the full transcript if it is already a single short sentence.
+    if not sentences:
+        sentences = [transcript]
+
+    seen:    set[str]               = set()
+    results: list[tuple[str, float]] = []
+
+    for sent in sentences:
+        for chunk, score in retriever.retrieve(sent, top_k=2):
+            if chunk not in seen:
+                seen.add(chunk)
+                results.append((chunk, score))
+
+    results.sort(key=lambda x: x[1], reverse=True)
+    return results[:top_k]
+
+
+# ── Fix 5 helper: word-level edit-distance ratio ─────────────────────────────
+
+def _edit_distance_ratio(a: str, b: str) -> float:
+    """
+    Return the SequenceMatcher word-level similarity ratio between *a* and *b*.
+    A ratio of 1.0 means identical; 0.0 means nothing in common.
+    """
+    return difflib.SequenceMatcher(None, a.split(), b.split()).ratio()
 
 
 # ── Stages 3 & 4: Context injection + LLM correction ─────────────────────────
@@ -253,8 +304,10 @@ def correct_transcript(
     -----
     1. Chunk the corpus (word-window, with overlap).
     2. Embed every chunk via *embed_model* (result cached to disk).
-    3. Embed *raw_transcript* and retrieve top-k chunks by cosine similarity.
-    4. Inject the retrieved chunks as context into the LLM correction prompt.
+    3. Embed *raw_transcript* (sentence-by-sentence) and retrieve top-k chunks.
+    4. Gate on retrieval confidence — skip LLM if score < SIMILARITY_THRESHOLD.
+    5. Inject the retrieved chunks as context into the LLM correction prompt.
+    6. Apply edit-distance guard — revert to raw if LLM diverges too much.
 
     Parameters
     ----------
@@ -262,7 +315,6 @@ def correct_transcript(
         The raw output from Whisper (or any ASR engine).
     language : {"ceb", "ilo", "hil", "war", "kap"}
         BCP-47-style language ID that selects the corpus to retrieve from.
-        Must be one of the keys defined in ``CORPUS_MAP``.
     llm_model : str
         Ollama generation model tag used for transcript correction.
     embed_model : str
@@ -276,14 +328,15 @@ def correct_transcript(
     -------
     (corrected_text, retrieved_context_string)
     """
-    # Resolve corpus path from the language selection
     if language not in CORPUS_MAP:
         raise ValueError(
             f"[RAG] Unknown language id '{language}'. "
             f"Valid options: {list(CORPUS_MAP.keys())}"
         )
-    corpus_path = CORPUS_MAP[language]
+
+    corpus_path   = CORPUS_MAP[language]
     language_name = _LANGUAGE_NAMES[language]
+    banned_langs  = ", ".join(_BANNED_LANGUAGES.get(language, []))
 
     project_root = os.path.normpath(
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
@@ -291,52 +344,66 @@ def correct_transcript(
     corpus_path = os.path.normpath(os.path.join(project_root, corpus_path))
     print(f"[RAG] Language: {language_name} | Corpus: {corpus_path}")
 
-    # Stage 1–3: Retrieve relevant context chunks
+    # ── Stage 1–2: Build / load index ────────────────────────────────────────
     try:
         retriever = EmbeddingRetriever(
             corpus_path=corpus_path,
             embed_model=embed_model,
             rebuild=rebuild,
         )
-        results = retriever.retrieve(raw_transcript, top_k=top_k)
-        context_str = "\n".join(
-            f"- [{score:.4f}] {chunk}" for chunk, score in results
-        )
-        if not context_str.strip():
-            context_str = "No relevant passages found in corpus."
+    except Exception as exc:
+        print(f"[RAG] Warning: could not build retriever — {exc}")
+        print("[RAG] Returning raw transcript unchanged.")
+        return raw_transcript, "Retriever unavailable."
+
+    # ── Stage 3: Per-sentence retrieval (Fix 4: query expansion) ─────────────
+    try:
+        results = _retrieve_for_transcript(retriever, raw_transcript, top_k)
     except Exception as exc:
         print(f"[RAG] Warning: retrieval failed — {exc}")
-        print("[RAG] Proceeding without retrieved context.")
-        context_str = "No reference context available."
+        results = []
+    if not results:
+        raise ValueError("[RAG] No retrieval results found.")
 
-    # Stage 4: LLM correction — inject retrieved context before the instruction
-    #
-    # Prompt structure follows Gemma 4 best-practice:
-    #   • System turn  → contract-style sections (Role / Success Criteria /
-    #                     Constraints / Output Contract)
-    #   • User turn    → explicit anchoring phrase + context block + transcript
-    #                     + one-shot example to lock the output format
+    best_score = results[0][1]
+    print(f"[RAG] Best retrieval score: {best_score:.4f} (threshold: {SIMILARITY_THRESHOLD})")
+
+    # ── Fix 3: Score-gated correction ────────────────────────────────────────
+    if best_score < SIMILARITY_THRESHOLD:
+        raise ValueError(
+            f"[RAG] Retrieval confidence too low ({best_score:.4f} < {SIMILARITY_THRESHOLD})."
+        )
+
+    context_str = "\n".join(
+        f"- [{score:.4f}] {chunk}" for chunk, score in results
+    )
+
+    # ── Stage 4: LLM correction with tightened prompt ────────────────────────
     messages = [
         {
             "role": "system",
             "content": (
-                # ── Role ──────────────────────────────────────────────────────
                 f"Role: You are a specialised ASR post-correction engine for "
-                f"{language_name}, a Philippine language.\n\n"
-                # ── Success Criteria ──────────────────────────────────────────
+                f"{language_name}, a Philippine language.\n"
+                f"You must output ONLY {language_name} text.\n\n"
                 "Success Criteria:\n"
                 "- Correct phonetic transcription errors and misspellings using "
                 "the reference passages supplied by the user.\n"
                 "- Preserve original word order; change only words that are "
                 "clearly wrong given the reference evidence.\n"
                 "- Maintain the exact sentence count of the input.\n\n"
-                # ── Constraints ───────────────────────────────────────────────
                 "Constraints:\n"
+                f"- CRITICAL: Never output {banned_langs} words. "
+                f"If the correct {language_name} form cannot be confirmed from "
+                "the reference passages, preserve the original word exactly.\n"
+                "- Only substitute a word if the replacement appears VERBATIM "
+                "in the reference passages. Do not infer, guess, or invent "
+                "corrections — if no passage-grounded fix exists, leave the "
+                "word as it is.\n"
                 "- Do not add, remove, or reorder sentences.\n"
                 "- Do not translate, summarise, or paraphrase.\n"
-                "- Do not hallucinate words absent from both the transcript and "
-                "the reference passages.\n\n"
-                # ── Output Contract ───────────────────────────────────────────
+                "- Do not hallucinate words absent from both the transcript "
+                "and the reference passages.\n\n"
                 "Output Contract:\n"
                 "Return only the corrected transcript text — no labels, "
                 "no explanations, no quotation marks, no markdown."
@@ -345,18 +412,12 @@ def correct_transcript(
         {
             "role": "user",
             "content": (
-                # ── Context anchoring ─────────────────────────────────────────
                 "Based on the reference passages below, correct the ASR transcript "
                 "that follows.\n\n"
                 f"Reference passages (format: [similarity] text):\n{context_str}\n\n"
-                # ── One-shot format example ───────────────────────────────────
-                # Note: use natural chat phrasing — NOT a completion-style
-                # "Output:" suffix, which causes ollama.chat() to return an
-                # empty string (the model treats the label as end-of-turn).
-                "Example — wrong:   an bisita nga mga tawo nga naganhi\n"
-                "Example — correct: an bisita nga mga tawo nga nagaabot\n\n"
-                # ── Actual task ───────────────────────────────────────────────
-                f"Now correct this transcript:\n{raw_transcript}"
+                f"Example — wrong:   an bisita nga mga tawo nga naganhi\n"
+                f"Example — correct: an bisita nga mga tawo nga nagaabot\n\n"
+                f"Now correct this {language_name} transcript:\n{raw_transcript}"
             ),
         },
     ]
@@ -365,36 +426,42 @@ def correct_transcript(
         response = ollama.chat(
             model=llm_model,
             messages=messages,
-            think=True,    # chain-of-thought improves phonetic reasoning on low-resource languages
+            think=LLM_THINK,
             options={
-                "temperature": 0.0,
-                # Gemma 4 thinking traces can easily exceed 1024 tokens,
-                # leaving nothing for the actual output.  2048 gives
-                # plenty of headroom for both thinking + response.
-                "num_predict": 2048,
+                "temperature": LLM_TEMPERATURE,
+                "num_predict": LLM_NUM_PREDICT,
             },
         )
 
-        # ── Debug: inspect what the model actually returned ───────────────
-        thinking = getattr(response.message, "thinking", None) or ""
+        thinking    = getattr(response.message, "thinking", None) or ""
         raw_content = response.message.content or ""
         print(f"[RAG-DEBUG] thinking length : {len(thinking)} chars")
         print(f"[RAG-DEBUG] content  length : {len(raw_content)} chars")
-        if raw_content.strip():
-            print(f"[RAG-DEBUG] raw content     : {raw_content[:200]!r}")
-        else:
-            print(f"[RAG-DEBUG] content is EMPTY — checking thinking tail …")
-            # Show last 300 chars of thinking so we can see if the answer
-            # was placed inside the thinking block instead.
-            print(f"[RAG-DEBUG] thinking tail   : …{thinking[-300:]!r}")
 
         content = raw_content.strip(' "\'\u2019\n')
+
+        # ── Fix 5: Edit-distance guard ────────────────────────────────────────
+        if content:
+            similarity = _edit_distance_ratio(raw_transcript, content)
+            change_fraction = 1.0 - similarity
+            print(
+                f"[RAG-DEBUG] edit change fraction: {change_fraction:.2f} "
+                f"(max allowed: {MAX_EDIT_RATIO})"
+            )
+            if change_fraction > MAX_EDIT_RATIO:
+                raise ValueError(
+                    f"[RAG] Correction diverges too much "
+                    f"({change_fraction:.0%} changed > {MAX_EDIT_RATIO:.0%} limit)."
+                )
+        else:
+            raise ValueError("[RAG] LLM returned empty content.")
+
         return content, context_str
 
     except Exception as exc:
-        error_msg = f"ERROR: Ollama chat call failed — {exc}"
-        print(error_msg)
-        return error_msg, context_str
+        if isinstance(exc, ValueError):
+            raise exc
+        raise RuntimeError(f"Ollama chat call failed — {exc}")
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -402,7 +469,6 @@ def correct_transcript(
 if __name__ == "__main__":
     rebuild_flag = "--rebuild" in sys.argv
 
-    # Test case: Waray transcript with typical ASR phonetic confusion
     test_raw = "Pero wara igsumat kan Kim kun ano an imo a-aplayan kay hiring yana."
     print(f"Raw transcript : {test_raw}\n")
 
