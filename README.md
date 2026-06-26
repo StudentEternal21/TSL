@@ -99,7 +99,7 @@
 ---
 ## Setup
 
-1. Run `ollama run qwen3.5:0.8b` in your terminal.
+1. Run `ollama pull gemma4:12b snowflake-arctic-embed2` in your terminal.
 2. Run `pipenv install` in your terminal.
 3. Run `pipenv shell` in your terminal.
 4. Run `python app.py` in your terminal.
