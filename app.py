@@ -51,7 +51,7 @@ PROMPTS = load_prompts()
 # ──────────────────────────────────────────────
 # Pipeline integration
 # ──────────────────────────────────────────────
-def submit_recording(audio_path, language, prompt_text):
+def submit_recording(audio_path, language, prompt_text, audio_type="donated"):
     """
     Save the recorded audio, then run the full
     Whisper → RAG correction pipeline on it.
@@ -60,12 +60,22 @@ def submit_recording(audio_path, language, prompt_text):
         return "⚠️ No recording found. Please record your voice first."
 
     # Create language-specific recordings directory
-    lang_dir = RECORDINGS_DIR / language
+    lang_dir = RECORDINGS_DIR / audio_type / language
     lang_dir.mkdir(parents=True, exist_ok=True)
+
+    # Map full name to 3-char ID
+    lang_map = {
+        "Kapampangan": "kap",
+        "Cebuano": "ceb",
+        "Ilocano": "ilo",
+        "Hiligaynon": "hil",
+        "Waray": "war"
+    }
+    lang_id = lang_map.get(language, "unk")
 
     # Generate a unique filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{language}_{timestamp}.wav"
+    filename = f"{lang_id}_{timestamp}.wav"
     dest_path = lang_dir / filename
 
     # Copy the audio file from Gradio's temp location
@@ -76,12 +86,12 @@ def submit_recording(audio_path, language, prompt_text):
     # results (audio_path, dialect, raw_whisper_transcript, corrected_transcript)
     # to data/metadata.csv — so we read the last row back to display them.
     try:
-        run_correction(str(dest_path))
+        run_correction(str(dest_path), language=lang_id)
 
         # Read back the last row from metadata.csv to display results
         with open(METADATA_FILE, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
-            rows = list(reader)
+            rows = [r for r in reader if r["audio_path"] == str(os.path.abspath(dest_path))]
 
         if rows:
             last = rows[-1]
