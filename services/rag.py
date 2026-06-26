@@ -18,10 +18,10 @@ LanguageID = Literal["ceb", "ilo", "hil", "war", "kap"]
 
 CORPUS_MAP: dict[str, str] = {
     "ceb": "data/raw_text/cebuano_text.jsonl",
-    "ilo": "data/raw_text/ilocano_text.jsonl",
+    "ilo": "data/raw_text/ilokano_text.jsonl",
     "hil": "data/raw_text/hiligaynon_text.jsonl",
     "war": "data/raw_text/waray_text.jsonl",
-    "kap": "data/raw_text/kapangpangan_text.jsonl",
+    "kap": "data/raw_text/kapamgpangan_text.jsonl",
 }
 
 _LANGUAGE_NAMES: dict[str, str] = {
