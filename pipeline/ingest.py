@@ -13,6 +13,18 @@ def initialize_ledger():
         df = pd.DataFrame(columns=["audio_path", "dialect", "transcript_clean", "audio_type"])
         df.to_csv(METADATA_FILE, index=False)
 
+def resolve_dialect_from_filename(filename):
+    """Maps filename prefixes to formal dialect names."""
+    mapping = {
+        "ceb": "Cebuano",
+        "hil": "Hiligaynon",
+        "ilo": "Ilocano",
+        "war": "Waray"
+    }
+    # Get the prefix (e.g., 'ceb' from 'ceb_001.wav')
+    prefix = filename.split('_')[0].lower()
+    return mapping.get(prefix, "Unknown")
+
 def ingest_audio_asset(source_audio_path, dialect, transcript, audio_type="donation"):
     """
     Ingests a new audio asset into the system and updates the metadata ledger.
@@ -37,6 +49,7 @@ def ingest_audio_asset(source_audio_path, dialect, transcript, audio_type="donat
 
         # Log asset ingestion in the metadata ledger
         df = pd.read_csv(METADATA_FILE)
+        dialect = resolve_dialect_from_filename(os.path.basename(source_audio_path))
         if output_path not in df["audio_path"].values:
             new_entry = {
                 "audio_path": output_path,
