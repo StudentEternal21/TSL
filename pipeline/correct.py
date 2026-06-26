@@ -1,0 +1,90 @@
+import csv
+import os
+
+from services.whisper import transcribe
+from services.rag import correct_transcript, CORPUS_MAP
+
+# Path to the metadata CSV, relative to the project root
+_PROJECT_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+_METADATA_CSV = os.path.join(_PROJECT_ROOT, "data", "metadata.csv")
+
+
+def run_correction(audio_path: str) -> None:
+    """
+    Transcribe a single audio file, correct the transcript via RAG, and
+    append one row to ``data/metadata.csv``.
+
+    The language corpus is selected automatically from the first three
+    characters of the audio file's basename (e.g. ``war_...wav`` → ``"war"``).
+
+    Parameters
+    ----------
+    audio_path : str
+        Absolute or project-root-relative path to the audio file.
+        The filename must begin with a valid language ID
+        (``ceb``, ``ilo``, ``hil``, ``war``, or ``kap``).
+
+    Raises
+    ------
+    ValueError
+        If the filename prefix is not a recognised language ID, or if the
+        RAG pipeline returns an empty corrected transcript.
+    """
+    filename = os.path.basename(audio_path)
+    language = filename[:3].lower()
+
+    if language not in CORPUS_MAP:
+        raise ValueError(
+            f"[Correction] Could not determine language from filename '{filename}'. "
+            f"First 3 characters '{language}' are not a valid language ID. "
+            f"Valid options: {list(CORPUS_MAP.keys())}"
+        )
+
+    print(f"[Correction] Audio   : {filename}")
+    print(f"[Correction] Language: {language}")
+
+    # Stage 1 — Transcribe
+    raw_transcript = transcribe(audio_path)
+    print(f"[Whisper] Raw transcript:\n{raw_transcript}\n")
+
+    # Stage 2 — RAG correction
+    corrected, context = correct_transcript(raw_transcript, language=language)
+    print(f"[RAG] Retrieved context:\n{context}\n")
+
+    if not corrected or not corrected.strip():
+        raise ValueError(
+            "[Correction] RAG pipeline returned an empty transcript. "
+            "Check the LLM/embedding service and corpus path."
+        )
+
+    print(f"[RAG] Corrected transcript:\n{corrected}\n")
+
+    # Stage 3 — Append to metadata.csv
+    row = {
+        "audio_path":            os.path.abspath(audio_path),
+        "dialect":               language,
+        "raw_whisper_transcript": raw_transcript,
+        "corrected_transcript":  corrected,
+    }
+
+    file_exists = os.path.isfile(_METADATA_CSV)
+    with open(_METADATA_CSV, "a", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(
+            fh,
+            fieldnames=["audio_path", "dialect", "raw_whisper_transcript", "corrected_transcript"],
+        )
+        if not file_exists or os.path.getsize(_METADATA_CSV) == 0:
+            writer.writeheader()
+        writer.writerow(row)
+
+    print(f"[Correction] Row appended to {_METADATA_CSV}")
+
+
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) < 2:
+        print("Usage: python -m pipeline.correct <audio_path>")
+        sys.exit(1)
+
+    run_correction(sys.argv[1])

@@ -99,7 +99,7 @@
 ---
 ## Setup
 
-1. Run `pip install ollama` in your terminal
+1. Install ollama, run `irm https://ollama.com/install.ps1 | iex` in your terminal
 2. Run `ollama pull gemma4:12b snowflake-arctic-embed2` in your terminal.
 3. Run `pipenv install` in your terminal.
 4. Run `pipenv shell` in your terminal.

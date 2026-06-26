@@ -1,15 +1,36 @@
 import os
 import sys
 import json
+from typing import Literal
 import numpy as np
 import ollama
 
 # ── Tuneable constants ──────────────────────────────────────────────────────
 CHUNK_SIZE    = 200   # words per chunk
 CHUNK_OVERLAP = 40    # words of overlap between adjacent chunks
-TOP_K         = 3     # number of retrieved chunks to inject as context
+TOP_K         = 10     # number of retrieved chunks to inject as context
 EMBED_MODEL   = "snowflake-arctic-embed2"   # ollama embedding model tag
 LLM_MODEL     = "gemma4:12b"               # ollama generation model tag
+# ────────────────────────────────────────────────────────────────────────────
+
+# ── Language → corpus file mapping ──────────────────────────────────────────
+LanguageID = Literal["ceb", "ilo", "hil", "war", "kap"]
+
+CORPUS_MAP: dict[str, str] = {
+    "ceb": "data/raw_text/cebuano_text.jsonl",
+    "ilo": "data/raw_text/ilocano_text.jsonl",
+    "hil": "data/raw_text/hiligaynon_text.jsonl",
+    "war": "data/raw_text/waray_text.jsonl",
+    "kap": "data/raw_text/kapangpangan_text.jsonl",
+}
+
+_LANGUAGE_NAMES: dict[str, str] = {
+    "ceb": "Cebuano",
+    "ilo": "Ilocano",
+    "hil": "Hiligaynon",
+    "war": "Waray",
+    "kap": "Kapampangan",
+}
 # ────────────────────────────────────────────────────────────────────────────
 
 
@@ -219,7 +240,7 @@ class EmbeddingRetriever:
 
 def correct_transcript(
     raw_transcript: str,
-    corpus_path: str       = "data/raw_text/waray_text.jsonl",
+    language: LanguageID   = "war",
     llm_model: str         = LLM_MODEL,
     embed_model: str       = EMBED_MODEL,
     top_k: int             = TOP_K,
@@ -239,8 +260,9 @@ def correct_transcript(
     ----------
     raw_transcript : str
         The raw output from Whisper (or any ASR engine).
-    corpus_path : str
-        Path to the ``.jsonl`` corpus — may be relative to the project root.
+    language : {"ceb", "ilo", "hil", "war", "kap"}
+        BCP-47-style language ID that selects the corpus to retrieve from.
+        Must be one of the keys defined in ``CORPUS_MAP``.
     llm_model : str
         Ollama generation model tag used for transcript correction.
     embed_model : str
@@ -254,12 +276,20 @@ def correct_transcript(
     -------
     (corrected_text, retrieved_context_string)
     """
-    # Resolve relative path relative to the *project root* (one level up from src/)
-    if not os.path.isabs(corpus_path):
-        project_root = os.path.normpath(
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+    # Resolve corpus path from the language selection
+    if language not in CORPUS_MAP:
+        raise ValueError(
+            f"[RAG] Unknown language id '{language}'. "
+            f"Valid options: {list(CORPUS_MAP.keys())}"
         )
-        corpus_path = os.path.normpath(os.path.join(project_root, corpus_path))
+    corpus_path = CORPUS_MAP[language]
+    language_name = _LANGUAGE_NAMES[language]
+
+    project_root = os.path.normpath(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+    )
+    corpus_path = os.path.normpath(os.path.join(project_root, corpus_path))
+    print(f"[RAG] Language: {language_name} | Corpus: {corpus_path}")
 
     # Stage 1–3: Retrieve relevant context chunks
     try:
@@ -291,8 +321,8 @@ def correct_transcript(
             "role": "system",
             "content": (
                 # ── Role ──────────────────────────────────────────────────────
-                "Role: You are a specialised ASR post-correction engine for "
-                "Philippine languages (Waray, Cebuano, Tagalog).\n\n"
+                f"Role: You are a specialised ASR post-correction engine for "
+                f"{language_name}, a Philippine language.\n\n"
                 # ── Success Criteria ──────────────────────────────────────────
                 "Success Criteria:\n"
                 "- Correct phonetic transcription errors and misspellings using "
@@ -373,12 +403,12 @@ if __name__ == "__main__":
     rebuild_flag = "--rebuild" in sys.argv
 
     # Test case: Waray transcript with typical ASR phonetic confusion
-    test_raw = "Waray pa hiya aaboton kay mapaso an bintanna."
+    test_raw = "Pero wara igsumat kan Kim kun ano an imo a-aplayan kay hiring yana."
     print(f"Raw transcript : {test_raw}\n")
 
     corrected, retrieved_context = correct_transcript(
         test_raw,
-        corpus_path="data/raw_text/waray_text.jsonl",
+        language="war",
         rebuild=rebuild_flag,
     )
 
