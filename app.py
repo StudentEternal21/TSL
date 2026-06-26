@@ -21,7 +21,7 @@ from pipeline.correct import run_correction
 BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / "data"
 PROMPTS_FILE = DATA_DIR / "prompts.json"
-RECORDINGS_DIR = DATA_DIR / "whisper_sound_processing"
+RECORDINGS_DIR = DATA_DIR / "audio_speech"
 METADATA_FILE = DATA_DIR / "metadata.csv"
 
 LANGUAGES = ["Kapampangan","Cebuano", "Ilocano", "Hiligaynon", "Waray"]
@@ -59,8 +59,10 @@ def submit_recording(audio_path, language, prompt_text, audio_type="donated"):
     if audio_path is None:
         return "⚠️ No recording found. Please record your voice first."
 
-    # Create language-specific recordings directory
-    lang_dir = RECORDINGS_DIR / audio_type / language
+    # Place recordings under data/audio_speech/<audio_type>/
+    # No language subfolder — the lang_id prefix in the filename is
+    # sufficient for dialect detection in run_correction.
+    lang_dir = RECORDINGS_DIR / audio_type
     lang_dir.mkdir(parents=True, exist_ok=True)
 
     # Map full name to 3-char ID
