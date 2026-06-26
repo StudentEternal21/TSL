@@ -1,7 +1,7 @@
 import os
 from services.audio import load_audio, save_audio, resample, normalize
 
-def inject_filipino_noise(clean_audio_path, noise_type, output_path="data/audio_speech/augmented", gain_db=-15):
+def inject_filipino_noise(clean_audio_path, noise_type, output_path="data/whisper_sound_processing", gain_db=-15):
     """
     Injects local background noise into a clean audio file.
     """
