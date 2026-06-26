@@ -9,34 +9,40 @@ _PROJECT_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__
 _METADATA_CSV = os.path.join(_PROJECT_ROOT, "data", "metadata.csv")
 
 
-def run_correction(audio_path: str) -> None:
+def run_correction(audio_path: str, language: str | None = None) -> None:
     """
     Transcribe a single audio file, correct the transcript via RAG, and
     append one row to ``data/metadata.csv``.
 
-    The language corpus is selected automatically from the first three
-    characters of the audio file's basename (e.g. ``war_...wav`` → ``"war"``).
+    The language corpus is selected from the first three characters of the
+    audio file's basename by default (e.g. ``war_...wav`` → ``"war"``).  Pass
+    *language* explicitly to override this behaviour (useful when the filename
+    does not carry a language prefix).
 
     Parameters
     ----------
     audio_path : str
         Absolute or project-root-relative path to the audio file.
-        The filename must begin with a valid language ID
-        (``ceb``, ``ilo``, ``hil``, ``war``, or ``kap``).
+    language : str | None
+        Language ID override (``"ceb"``, ``"ilo"``, ``"hil"``, ``"war"``,
+        ``"kap"``).  When ``None`` the ID is derived from the first three
+        characters of the filename.
 
     Raises
     ------
     ValueError
-        If the filename prefix is not a recognised language ID, or if the
-        RAG pipeline returns an empty corrected transcript.
+        If the resolved language ID is not recognised, or if the RAG pipeline
+        returns an empty corrected transcript.
     """
     filename = os.path.basename(audio_path)
-    language = filename[:3].lower()
+
+    if language is None:
+        language = filename[:3].lower()
 
     if language not in CORPUS_MAP:
         raise ValueError(
             f"[Correction] Could not determine language from filename '{filename}'. "
-            f"First 3 characters '{language}' are not a valid language ID. "
+            f"Resolved language ID '{language}' is not valid. "
             f"Valid options: {list(CORPUS_MAP.keys())}"
         )
 

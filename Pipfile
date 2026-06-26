@@ -7,8 +7,8 @@ name = "pypi"
 faster-whisper = "*"
 gradio = "*"
 ollama = "*"
+flask = "*"
 
 [dev-packages]
 
 [requires]
-
