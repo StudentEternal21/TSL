@@ -13,6 +13,7 @@ import csv
 import random
 from datetime import datetime
 from pathlib import Path
+from pipeline.correct import run_correction
 
 # ──────────────────────────────────────────────
 # Configuration
@@ -20,7 +21,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / "data"
 PROMPTS_FILE = DATA_DIR / "prompts.json"
-RECORDINGS_DIR = DATA_DIR / "recordings"
+RECORDINGS_DIR = DATA_DIR / "whisper_sound_processing"
 METADATA_FILE = DATA_DIR / "metadata.csv"
 
 LANGUAGES = ["Kapampangan","Cebuano", "Ilocano", "Hiligaynon", "Waray"]
@@ -48,13 +49,12 @@ PROMPTS = load_prompts()
 
 
 # ──────────────────────────────────────────────
-# Pipeline stub
+# Pipeline integration
 # ──────────────────────────────────────────────
 def submit_recording(audio_path, language, prompt_text):
     """
-    Save the recorded audio and log metadata.
-    This is the hook where you will later call the
-    Whisper → RAG pipeline (src/ingestion.py).
+    Save the recorded audio, then run the full
+    Whisper → RAG correction pipeline on it.
     """
     if audio_path is None:
         return "⚠️ No recording found. Please record your voice first."
@@ -71,15 +71,31 @@ def submit_recording(audio_path, language, prompt_text):
     # Copy the audio file from Gradio's temp location
     shutil.copy2(audio_path, dest_path)
 
-    # Append metadata to CSV
-    write_header = not METADATA_FILE.exists()
-    with open(METADATA_FILE, "a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        if write_header:
-            writer.writerow(["filename", "language", "prompt", "timestamp", "path"])
-        writer.writerow([filename, language, prompt_text, timestamp, str(dest_path)])
+    # Run the Whisper → RAG correction pipeline
+    # run_correction handles transcription, RAG correction, and appends
+    # results (audio_path, dialect, raw_whisper_transcript, corrected_transcript)
+    # to data/metadata.csv — so we read the last row back to display them.
+    try:
+        run_correction(str(dest_path))
 
-    return f"✅ Recording saved! ({filename})"
+        # Read back the last row from metadata.csv to display results
+        with open(METADATA_FILE, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+
+        if rows:
+            last = rows[-1]
+            raw_transcript = last.get("raw_whisper_transcript", "")
+            corrected_transcript = last.get("corrected_transcript", "")
+            return (
+                f"✅ Recording saved! ({filename})\n\n"
+                f"**🎤 Whisper (raw):**\n{raw_transcript}\n\n"
+                f"**✨ POSO (corrected):**\n{corrected_transcript}"
+            )
+        return f"✅ Recording saved! ({filename})"
+    except Exception as exc:
+        print(f"[App] Pipeline error: {exc}")
+        return f"✅ Recording saved! ({filename})\n\n⚠️ Correction unavailable: {exc}"
 
 
 def get_random_prompt(language):
