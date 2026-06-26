@@ -280,24 +280,52 @@ def correct_transcript(
         context_str = "No reference context available."
 
     # Stage 4: LLM correction — inject retrieved context before the instruction
+    #
+    # Prompt structure follows Gemma 4 best-practice:
+    #   • System turn  → contract-style sections (Role / Success Criteria /
+    #                     Constraints / Output Contract)
+    #   • User turn    → explicit anchoring phrase + context block + transcript
+    #                     + one-shot example to lock the output format
     messages = [
         {
             "role": "system",
             "content": (
-                "You are an expert ASR transcript correction tool specialised in "
-                "Philippine languages (Waray, Cebuano, Tagalog). "
-                "Fix spelling and phonetic errors in the user's transcript using "
-                "the retrieved reference passages as domain-specific context. "
-                "CRITICAL: Output ONLY the corrected transcript text. "
-                "Do not include explanations, labels, or quotation marks."
+                # ── Role ──────────────────────────────────────────────────────
+                "Role: You are a specialised ASR post-correction engine for "
+                "Philippine languages (Waray, Cebuano, Tagalog).\n\n"
+                # ── Success Criteria ──────────────────────────────────────────
+                "Success Criteria:\n"
+                "- Correct phonetic transcription errors and misspellings using "
+                "the reference passages supplied by the user.\n"
+                "- Preserve original word order; change only words that are "
+                "clearly wrong given the reference evidence.\n"
+                "- Maintain the exact sentence count of the input.\n\n"
+                # ── Constraints ───────────────────────────────────────────────
+                "Constraints:\n"
+                "- Do not add, remove, or reorder sentences.\n"
+                "- Do not translate, summarise, or paraphrase.\n"
+                "- Do not hallucinate words absent from both the transcript and "
+                "the reference passages.\n\n"
+                # ── Output Contract ───────────────────────────────────────────
+                "Output Contract:\n"
+                "Return only the corrected transcript text — no labels, "
+                "no explanations, no quotation marks, no markdown."
             ),
         },
         {
             "role": "user",
             "content": (
-                f"Reference passages retrieved from the text corpus "
-                f"(format: [similarity] text):\n{context_str}\n\n"
-                f"ASR transcript to correct:\n{raw_transcript}"
+                # ── Context anchoring ─────────────────────────────────────────
+                "Based on the reference passages below, correct the ASR transcript "
+                "that follows.\n\n"
+                f"Reference passages (format: [similarity] text):\n{context_str}\n\n"
+                # ── One-shot format example ───────────────────────────────────
+                "Example\n"
+                "Input:  an bisita nga mga tawo nga naganhi\n"
+                "Output: an bisita nga mga tawo nga nagaabot\n\n"
+                # ── Actual task ───────────────────────────────────────────────
+                f"Input:  {raw_transcript}\n"
+                "Output:"
             ),
         },
     ]
@@ -309,7 +337,9 @@ def correct_transcript(
             think=True,    # chain-of-thought improves phonetic reasoning on low-resource languages
             options={
                 "temperature": 0.0,
-                "num_predict": 512,   # must cover thinking tokens + actual output
+                # Gemma 4 thinking traces are substantially longer than earlier
+                # models — raise the budget so the output is never truncated.
+                "num_predict": 1024,
             },
         )
         content = response.message.content.strip(' "\'\u2019\n')
